@@ -40,6 +40,8 @@ class get_data():
             data_ai = np.append(data_ai, np.array(data.shift(i))[np.newaxis,:,:].transpose(1, 2, 0), axis=2)
 
         data_ai = data_ai[seq_train + seq_test - 1:, :, ::-1]
+        start = np.full((data_ai.shape[0], 2, 1), -1)
+        end = np.full((data_ai.shape[0], 2, 1), -2)
 
-        return data_ai[:, :, :seq_train], data_ai[:, :-1, -seq_test:]
+        return (data_ai[:, :, :seq_train], np.concatenate([start, data_ai[:, :-1, -seq_test:]], axis=2)), np.concatenate([data_ai[:, :-1, -seq_test:], end], axis=2)
     

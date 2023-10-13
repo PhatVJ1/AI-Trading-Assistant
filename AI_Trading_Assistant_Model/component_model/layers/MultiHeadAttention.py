@@ -34,6 +34,10 @@ class CrossAttention(BaseAttention):
     return x
   
 class CausalSelfAttention(BaseAttention):
+  def __init__(self, **kwargs):
+    super().__init__(**kwargs)
+    self.layernorm1 = tf.keras.layers.LayerNormalization()
+
   def call(self, x):
     open = x[:,0,:,:]
     close = x[:,1,:,:]
@@ -55,7 +59,6 @@ class CausalSelfAttention(BaseAttention):
 
     open = tf.expand_dims(self.layernorm(open), axis=1)
 
-    self.layernorm1 = tf.keras.layers.LayerNormalization()
     close = tf.expand_dims(self.layernorm1(close), axis=1)
 
     x = tf.concat([open, close], axis=1)
