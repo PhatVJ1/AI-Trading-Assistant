@@ -22,29 +22,33 @@ class EncoderLayer(tf.keras.layers.Layer):
   def __init__(self,*, d_model, num_heads, dff, dropout_rate=0.1):
     super().__init__()
 
-    self.self_attention = MultiHeadAttention.GlobalSelfAttention(
+    self.self_attention1 = MultiHeadAttention.GlobalSelfAttention(
+        num_heads=num_heads,
+        key_dim=d_model,
+        dropout=dropout_rate)
+    
+    self.self_attention2 = MultiHeadAttention.GlobalSelfAttention(
         num_heads=num_heads,
         key_dim=d_model,
         dropout=dropout_rate)
 
-    self.ffn_o = FeedForward(d_model, dff)
-    self.ffn_c = FeedForward(d_model, dff)
+    self.ffn = FeedForward(d_model, dff)
 
   def call(self, x):
-    open = x[:,0,:,:]
-    close = x[:,1,:,:]
+    x1 = x[:,0,:,:]
+    x2 = x[:,1,:,:]
 
-    open = open + tf.math.sigmoid(close)
-    close = close + tf.math.sigmoid(open)
+    x1 = self.self_attention1(x1)
+    x2 = self.self_attention1(x2)
 
-    open = self.self_attention(open)
-    close = self.self_attention(close)
+    x1 = x1 * tf.math.sigmoid(x2)
+    x2 = x2 * tf.math.sigmoid(x1)
 
-    open = tf.expand_dims(self.ffn_o(open), axis=1)
-    close = tf.expand_dims(self.ffn_c(close), axis=1)
+    x1 = tf.expand_dims(x1, axis=1)
+    x2 = tf.expand_dims(x2, axis=1)
+    x = tf.concat([x1, x2], axis=1)
 
-    x = tf.concat([open, close], axis=1)
-
+    x = self.ffn(x)
     return x
   
 class DecoderLayer(tf.keras.layers.Layer):
@@ -65,20 +69,26 @@ class DecoderLayer(tf.keras.layers.Layer):
         num_heads=num_heads,
         key_dim=d_model,
         dropout=dropout_rate)
+    
+    self.cross_attention1 = MultiHeadAttention.CrossAttention(
+        num_heads=num_heads,
+        key_dim=d_model,
+        dropout=dropout_rate)
 
     self.ffn_c = FeedForward(d_model, dff)
     self.ffn_o = FeedForward(d_model, dff)
 
   def call(self, x, context):
     x = self.causal_self_attention(x=x)
-    x = self.cross_attention(x=x, context=context)
+    x1 = self.cross_attention(x=x[:,0,:,:], context=context[:,0,:,:])
+    x2 = self.cross_attention1(x=x[:,1,:,:], context=context[:,1,:,:])
 
     # Cache the last attention scores for plotting later
     self.last_attn_scores = self.cross_attention.last_attn_scores
  
-    open = tf.expand_dims(self.ffn_o(x[:,0,:,:]), axis=1)
-    close = tf.expand_dims(self.ffn_c(x[:,1,:,:]), axis=1)
+    x1 = tf.expand_dims(self.ffn_o(x1), axis=1)
+    x2 = tf.expand_dims(self.ffn_c(x2), axis=1)
 
-    x = tf.concat([open, close], axis=1)
+    x = tf.concat([x1, x2], axis=1)
 
     return x

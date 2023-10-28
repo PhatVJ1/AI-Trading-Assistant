@@ -33,15 +33,36 @@ class get_data():
     def get_train_test(self):
         return self.train, self.test
 
-    def data_generator(self, data, seq_train, seq_test):
-        data = data[['Open', 'Close', 'Volume']]
-        data_ai = np.empty((len(data), 3, 0))
-        for i in range(seq_train + seq_test):
+    def data_generator(self, data, seq_train, seq_label):
+      data = data[['Open', 'Close', 'Volume']]
+      data_ai = np.empty((len(data), 3, 0))
+      for i in range(seq_train + seq_label):
             data_ai = np.append(data_ai, np.array(data.shift(i))[np.newaxis,:,:].transpose(1, 2, 0), axis=2)
 
-        data_ai = data_ai[seq_train + seq_test - 1:, :, ::-1]
-        start = np.full((data_ai.shape[0], 2, 1), -1)
-        end = np.full((data_ai.shape[0], 2, 1), -2)
+      data_ai = data_ai[seq_train + seq_label - 1:, :, ::-1]
+      start = np.full((2, 1), -1)
 
-        return (data_ai[:, :, :seq_train], np.concatenate([start, data_ai[:, :-1, -seq_test:]], axis=2)), np.concatenate([data_ai[:, :-1, -seq_test:], end], axis=2)
+      train = []
+      label = np.empty((0, 2, seq_label))
+      for j in data_ai:
+              for i in range(seq_label):
+                    mask = np.zeros((j.shape[0] - 1, seq_label), bool)
+                    mask[:, 1:i+1] = True
+                    mask[:, :1] = True
+                    train.append((j[:, :seq_train], np.where(mask, np.concatenate([start, j[:-1, -seq_label:-1]], axis=1), 0.)))
+                    label = np.concatenate((label, np.where(mask, j[:-1, -seq_label:], 0.)[None, :, :]), axis=0)
+        
+      x = np.empty((0, 3, seq_train))
+      y_in = np.empty((0, 2, seq_label))
+      for i, j in train:
+            x = np.concatenate((x, i[None, :, :]), axis=0)
+            y_in = np.concatenate((y_in, j[None, :, :]), axis=0)
+      
+      y_o = np.empty((0, seq_label))
+      y_c = np.empty((0, seq_label))
+      for i in label:
+            y_o = np.concatenate((y_o, i[0][None, :]), axis=0)
+            y_c = np.concatenate((y_c, i[1][None, :]), axis=0)
+
+      return (x, y_in), (y_o, y_c)
     

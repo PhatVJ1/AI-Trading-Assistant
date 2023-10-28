@@ -17,6 +17,19 @@ class GlobalSelfAttention(BaseAttention):
     x = self.layernorm(x)
     return x
   
+  def get_config(self):
+    config = super().get_config()
+    config.update({
+        'mha': self.mha.get_config(),
+        'layernorm': self.layernorm.get_config(),
+        'add': self.add.get_config(),
+    })
+    return config
+
+  @classmethod
+  def from_config(cls, config):
+    return cls(**config)
+  
 class CrossAttention(BaseAttention):
   def call(self, x, context):
     attn_output, attn_scores = self.mha(
@@ -36,31 +49,31 @@ class CrossAttention(BaseAttention):
 class CausalSelfAttention(BaseAttention):
   def __init__(self, **kwargs):
     super().__init__(**kwargs)
+    self.mha1 = tf.keras.layers.MultiHeadAttention(**kwargs)
     self.layernorm1 = tf.keras.layers.LayerNormalization()
 
   def call(self, x):
-    open = x[:,0,:,:]
-    close = x[:,1,:,:]
+    x1 = x[:,0,:,:]
+    x2 = x[:,1,:,:]
 
-    open_attn = self.mha(
-        query=open,
-        value=open,
-        key=open,
+    x1_attn = self.mha(
+        query=x1,
+        value=x1,
+        key=x1,
         use_causal_mask = True)
     
-    close_attn = self.mha(
-        query=close,
-        value=close,
-        key=close,
+    x2_attn = self.mha1(
+        query=x2,
+        value=x2,
+        key=x2,
         use_causal_mask = True)
     
-    open = self.add([open, open_attn])
-    close = self.add([close, close_attn])
+    x1 = self.add([x1 * tf.math.sigmoid(x2_attn), x1_attn])
+    x2 = self.add([x2 * tf.math.sigmoid(x1_attn), x2_attn])
 
-    open = tf.expand_dims(self.layernorm(open), axis=1)
+    x1 = tf.expand_dims(self.layernorm(x1), axis=1)
+    x2 = tf.expand_dims(self.layernorm1(x2), axis=1)
 
-    close = tf.expand_dims(self.layernorm1(close), axis=1)
-
-    x = tf.concat([open, close], axis=1)
+    x = tf.concat([x1, x2], axis=1)
     
     return x

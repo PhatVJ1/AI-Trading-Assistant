@@ -1,6 +1,7 @@
 import tensorflow as tf
 from . import Encoder_Decoder as ed
 from . import hyperparameter as hp
+from tensorflow.keras import backend as K
 
 class Transformer(tf.keras.Model):
   def __init__(self, *, num_layers, d_model, num_heads, dff,
@@ -15,18 +16,13 @@ class Transformer(tf.keras.Model):
                            num_heads=num_heads, dff=dff,
                            vocab_size=target_vocab_size,
                            dropout_rate=dropout_rate)
+    
+    self.conv2d = tf.keras.layers.Conv2D(dff, kernel_size=3, padding="same")
 
     self.final_layer_c = tf.keras.layers.Dense(target_vocab_size)
     self.final_layer_o = tf.keras.layers.Dense(target_vocab_size)
 
     self.flatten = tf.keras.layers.Flatten()
-
-    self.global_dense = tf.keras.layers.Dense(dff, activation='linear')
-
-    self.dense = [
-      tf.keras.layers.Dense(1, activation='linear')
-      for _ in range(target_vocab_size * 2)
-    ]
 
   def call(self, inputs):
     # To use a Keras model with `.fit` you must pass all your inputs in the
@@ -35,11 +31,15 @@ class Transformer(tf.keras.Model):
 
     context = self.encoder(context)  # (batch_size, context_len, d_model)
 
-    x = self.decoder(x, context)  # (batch_size, target_len, d_model)
+    x = self.decoder(x, context)  # (batch_size, target_len, d_model
+    x = self.conv2d(x)
+
+    logits_o = self.flatten(x[:,0,:,:])
+    logits_c = self.flatten(x[:,1,:,:])
 
     # Final linear layer output.
-    logits_o = tf.expand_dims(self.final_layer_o(x[:,0,:,:]), axis=1)  # (batch_size, target_len, target_vocab_size)
-    logits_c = tf.expand_dims(self.final_layer_c(x[:,1,:,:]), axis=1)
+    logits_o = self.final_layer_o(logits_o) # (batch_size, target_len, target_vocab_size)
+    logits_c = self.final_layer_c(logits_c)
 
     try:
       # Drop the keras mask, so it doesn't scale the losses/metrics.
@@ -49,25 +49,11 @@ class Transformer(tf.keras.Model):
     except AttributeError:
       pass
     
-    logits_o = self.flatten(logits_o)
-    logits_c = self.flatten(logits_c)
-
-    logists = tf.concat([logits_o, logits_c], axis=1)
-    logists = self.global_dense(logists)
-
-    open = tf.expand_dims(self.dense[0](logists), axis=-1)
-    close = tf.expand_dims(self.dense[1](logists), axis=-1)
+    logits_o = tf.squeeze(logits_o)
+    logits_c = tf.squeeze(logits_c)
+    output = [logits_o, logits_c]
     
-    output = tf.concat([open, close], axis=1)
-
-    for i in range(1, int(len(self.dense) / 2)):
-      open = tf.expand_dims(self.dense[i*2](logists), axis=-1)
-      close = tf.expand_dims(self.dense[i*2 + 1](logists), axis=-1)
-      output = tf.concat([output, tf.concat([open, close], axis=1)], axis=-1)
-
-    # Return the final output and the attention weights.
     return output
-
 
 class model():
   def __init__(self, *, input_shape, num_layers, d_model, num_heads, dff,
@@ -90,6 +76,17 @@ class model():
                         input_vocab_size=self.input_vocab_size, target_vocab_size=self.target_vocab_size, dropout_rate=self.dropout_rate)
     model.build(self.input_shape)
     optimizer = hp.optimizer(self.d_model, self.warmup_steps, self.beta_1, self.beta_2, self.epsilon)
-    model.compile(optimizer=optimizer.get(), loss='mse', metrics=['mse', 'mae'])
-
+    model.compile(optimizer=optimizer.get(), loss=[masked_loss, masked_loss], metrics={"output_1" : custom_metric, "output_2" : custom_metric})
     return model
+
+def masked_loss(y_true, y_pred):
+    mask = tf.cast(tf.not_equal(y_true, 0), tf.float32)
+    squared_difference = tf.square(y_true - y_pred)
+    masked_loss = mask * squared_difference
+    return tf.reduce_mean(masked_loss)
+
+def custom_metric(y_true, y_pred):
+    mask = K.cast(K.not_equal(y_true, 0), 'float32')
+    squared_difference = tf.square(y_true - y_pred)
+    masked_squared_difference = mask * squared_difference
+    return K.sqrt(K.mean(masked_squared_difference))
