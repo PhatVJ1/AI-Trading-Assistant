@@ -66,5 +66,5 @@ def signal_decay_loss(y_true, y_pred):
     loss = K.sum(K.abs(y_true - y_pred), axis=0)
     decay = tf.range(1, seq_length + 1, dtype=tf.float32)
     decay = K.pow(decay, -0.5)
-    loss = K.min(loss / decay / tf.cast(length, tf.float32))
+    loss = K.mean(loss / decay / tf.cast(length, tf.float32))
     return loss
