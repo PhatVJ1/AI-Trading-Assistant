@@ -5,6 +5,7 @@ import pandas as pd
 from datetime import date, timedelta
 from streamlit_process import plot as plt 
 from AI_Trading_Assistant_Model.Channel_Aligned_Robust_Dual_Transformer import CARD
+from AI_Trading_Assistant_Model.input_created import data_generator as dg
 import tensorflow as tf
 
 
@@ -12,7 +13,7 @@ import tensorflow as tf
 st.title('Biểu đồ nến và các chiến thuật')
 
 # Danh sách mã cổ phiếu
-stock_symbols = ['Meta', 'AAPL', 'MSFT', 'TSLA', 'AMZN', 'ADA-USD',
+stock_symbols = ['META', 'AAPL', 'MSFT', 'TSLA', 'AMZN', 'ADA-USD',
                  'XRP-USD', 'ETH-USD', 'CLDX', 'XPEV',
                  'NVDA', 'GOOGL']
 
@@ -42,17 +43,23 @@ data = data_frame.copy()
 plot = plt.draw(stock_symbol,20,20)
 plot(data)
 
-data_for_pred = tf.expand_dims(tf.convert_to_tensor(data[['Open', 'Close']])[-50:], axis=0)
+data_for_pred = data[['Open', 'Close']].tail(60)
+data_for_pred, _ = dg(data=data_for_pred, seq_train=50, seq_label=0)
+model = None
+if "model_check" not in st.session_state:
+    st.session_state.model_check = False
 
 
-def model_run(input):
-    model = CARD.Transformer(50, 3, 2, 3, 1, 1024, 8, 64, 0.9, 3)
-    CARD.model_builder(model, input)
-    model.load_weights("C:/Users/Nguyen Phat/AI-Trading-Assistant/AI_Trading_Assistant_Model/model_weights/best_model_new_odd.h5")
-    return model(input)
+def model_run(input, model, model_name):
+    model.load_weights("AI-Trading-Assistant/AI_Trading_Assistant_Model/model_weights/" + model_name + ".h5")
+    return model.predict(input)
 
 if st.button("Chạy Model"):
-    result = model_run(data_for_pred)  # Gọi hàm chạy model
+    if st.session_state.model_check == False:
+        model = CARD.Transformer(50, 3, 2, 3, 1, 2048, 8, 64, 0.9, 3)
+        CARD.model_builder(model, data_for_pred[1:])
+        st.session_state.model_check = True
+    result = model_run(data_for_pred, model, stock_symbol)  # Gọi hàm chạy model
     st.write("Kết quả: ", result)  # Hiển thị kết quả
 
 

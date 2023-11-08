@@ -4,6 +4,8 @@ from .Module.main_module import Tensor2Seq
 from tensorflow.keras.callbacks import ModelCheckpoint
 from tensorflow.keras import backend as K
 
+from tensorflow.keras import backend as K
+
 class Transformer(tf.keras.Model):
     def __init__(
         self,
@@ -21,7 +23,7 @@ class Transformer(tf.keras.Model):
     ):
         super().__init__()
         self.TransformerBlock = DualTransformerBlock(seq_length=seq_length, patch_size=patch_size, strides=strides, dff=dff, num_layer=num_layer, num_heads=num_heads, d_model=d_model, decay=decay)
-        self.T2S = Tensor2Seq(output_length=output_length)
+        self.T2S = Tensor2Seq(output_length=output_length, dff=dff)
         self.channel = channel
 
     def call(self, x):

@@ -42,9 +42,12 @@ class DualTransformerBlock(tf.keras.layers.Layer):
 
 #Convert attention to target predict sequence
 class Tensor2Seq(tf.keras.layers.Layer):
-    def __init__(self,*, output_length):
+    def __init__(self,*, output_length, dff):
         super().__init__()
-        self.MLP = tf.keras.layers.Dense(output_length, activation="linear")
+        self.MLP = tf.keras.Sequential([
+            tf.keras.layers.Dense(output_length * dff, activation="gelu"),
+            tf.keras.layers.Dense(output_length, activation="linear")
+        ])
 
     def call(self, x):
         x_shape = tf.shape(x)
