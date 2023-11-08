@@ -16,17 +16,24 @@ class Transformer(tf.keras.Model):
         num_heads: int,
         d_model: int,
         decay: float,
+        num_layer: int,
         **kwargs,
     ):
         super().__init__()
-        self.TransformerBlock = DualTransformerBlock(seq_length=seq_length, channel=channel, patch_size=patch_size, strides=strides, dff=dff, num_heads=num_heads, d_model=d_model, decay=decay)
-        self.T2S = Tensor2Seq(output_length=output_length, channel=channel, d_model=d_model, dff=dff)
+        self.TransformerBlock = DualTransformerBlock(seq_length=seq_length, patch_size=patch_size, strides=strides, dff=dff, num_layer=num_layer, num_heads=num_heads, d_model=d_model, decay=decay)
+        self.T2S = Tensor2Seq(output_length=output_length)
         self.channel = channel
 
     def call(self, x):
+        x = tf.cast(x, tf.float32)
+        x_mean = K.mean(x, axis=-2, keepdims=True)
+        x_std = K.std(x, axis=-2, keepdims=True)
+        x = (x - x_mean)/(x_std + 1e-4)
 
         x = self.TransformerBlock(x)
         x = self.T2S(x)
+
+        x = x * (tf.transpose(x_std, perm=(0, 2, 1)) + 1e-4) + tf.transpose(x_mean, perm=(0, 2, 1))
 
         return x
     
@@ -59,12 +66,11 @@ class CustomModelCheckpoint(ModelCheckpoint):
             self.model.save_weights(filepath, overwrite=overwrite, options=options)
             print(f'\nModel saved weights at {filepath}')
 
-
 def signal_decay_loss(y_true, y_pred):
     length = len(y_true)
     seq_length = y_true.shape[-1]
     loss = K.sum(K.abs(y_true - y_pred), axis=0)
     decay = tf.range(1, seq_length + 1, dtype=tf.float32)
     decay = K.pow(decay, -0.5)
-    loss = K.mean(loss / decay / tf.cast(length, tf.float32))
-    return loss
+    loss = K.min(loss / tf.expand_dims(decay, axis = 0) / tf.cast(length, tf.float32), axis=1)
+    return K.mean(loss)
