@@ -45,20 +45,17 @@ plot(data)
 
 data_for_pred = data[['Open', 'Close']].tail(60)
 data_for_pred, _ = dg(data=data_for_pred, seq_train=50, seq_label=0)
-model = None
-if "model_check" not in st.session_state:
-    st.session_state.model_check = False
 
 
 def model_run(input, model, model_name):
-    model.load_weights("AI-Trading-Assistant/AI_Trading_Assistant_Model/model_weights/" + model_name + ".h5")
+    model.load_weights("AI_Trading_Assistant_Model/model_weights/" + model_name + ".h5")
     return model.predict(input)
 
 if st.button("Chạy Model"):
-    if st.session_state.model_check == False:
-        model = CARD.Transformer(50, 3, 2, 3, 1, 2048, 8, 64, 0.9, 3)
-        CARD.model_builder(model, data_for_pred[1:])
-        st.session_state.model_check = True
+    
+    model = CARD.Transformer(50, 3, 2, 3, 1, 2048, 8, 64, 0.9, 3)
+    CARD.model_builder(model, data_for_pred[1:])
+
     result = model_run(data_for_pred, model, stock_symbol)  # Gọi hàm chạy model
     st.write("Kết quả: ", result)  # Hiển thị kết quả
 
