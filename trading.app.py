@@ -48,7 +48,7 @@ def model_run(input, model, model_name):
     model.load_weights("AI_Trading_Assistant_Model/model_weights/" + model_name + ".h5")
     return tf.squeeze(model.predict(input))
 
-if st.button("Chạy Model"):
+if st.button("Đưa ra dự báo tương lai cho cổ phiếu bạn đang xem"):
     
     model = CARD.Transformer(50, 3, 2, 3, 1, 2048, 8, 64, 0.9, 3)
     CARD.model_builder(model, data_for_pred[1:])
@@ -74,9 +74,9 @@ if st.button("Chạy Model"):
     st.plotly_chart(fig)
 
     if result[1,0] > result[1,1] and result[1,1] > result[1,2]:
-        st.header("Xu hướng sắp tới sẽ giảm")
+        st.markdown("<h1 style='text-align: center; color: red; font-family: roboto;'>Xu hướng sắp tới sẽ giảm</h1>", unsafe_allow_html=True)
     if result[1,0] < result[1,1] and result[1,1] < result[1,2]:
-        st.header("Xu hướng sắp tới sẽ tăng")
+        st.markdown("<h1 style='text-align: center; color: green; font-family: roboto;'>Xu hướng sắp tới sẽ tăng</h1>", unsafe_allow_html=True)
     if result[1,0] > result[1,1] and result[1,1] < result[1,2] or result[1,0] < result[1,1] and result[1,1] > result[1,2]:
-        st.header("Xu hướng thị trường đang tích lũy")
+        st.markdown("<h1 style='text-align: center; color: yellow; font-family: roboto;'>Xu hướng sắp tới đang tích lũy</h1>", unsafe_allow_html=True)
 
