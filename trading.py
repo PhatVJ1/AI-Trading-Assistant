@@ -5,9 +5,8 @@ import pandas as pd
 from datetime import date, timedelta
 from streamlit_process import plot as plt 
 from AI_Trading_Assistant_Model.Channel_Aligned_Robust_Dual_Transformer import CARD
-from AI_Trading_Assistant_Model.input_created import data_generator as dg
 import tensorflow as tf
-
+import plotly.graph_objects as go
 
 # Tạo ứng dụng Streamlit
 st.title('Biểu đồ nến và các chiến thuật')
@@ -40,16 +39,14 @@ data_frame = yf.download(stock_symbol, start=start_date, end=end_date, interval=
 data = data_frame.copy()
 
 
-plot = plt.draw(stock_symbol,20,20)
+plot = plt.draw(stock_symbol,20,20,12,26,9)
 plot(data)
 
-data_for_pred = data[['Open', 'Close']].tail(60)
-data_for_pred, _ = dg(data=data_for_pred, seq_train=50, seq_label=0)
-
+data_for_pred = tf.expand_dims(tf.convert_to_tensor(data[['Open', 'Close']].tail(50)), axis=0)
 
 def model_run(input, model, model_name):
     model.load_weights("AI_Trading_Assistant_Model/model_weights/" + model_name + ".h5")
-    return model.predict(input)
+    return tf.squeeze(model.predict(input))
 
 if st.button("Chạy Model"):
     
@@ -57,6 +54,29 @@ if st.button("Chạy Model"):
     CARD.model_builder(model, data_for_pred[1:])
 
     result = model_run(data_for_pred, model, stock_symbol)  # Gọi hàm chạy model
-    st.write("Kết quả: ", result)  # Hiển thị kết quả
 
+    # Tạo một danh sách (list) để lưu trữ các ngày sau khi thêm 3 ngày
+    date_list = [end_date]
+
+    # Thêm 3 ngày vào danh sách
+    for i in range(1, 4):
+        new_date = end_date + timedelta(days=i)
+        date_list.append(new_date)
+
+    fig = go.Figure(data=[go.Candlestick(x=date_list,
+                    open=result[0, :],
+                    high=result[0, :],
+                    low=result[1, :],
+                    close=result[1, :])])
+
+    fig.update_layout(title='Candlestick Chart Predict')
+    # Hiển thị biểu đồ trong Streamlit
+    st.plotly_chart(fig)
+
+    if result[1,0] > result[1,1] and result[1,1] > result[1,2]:
+        st.header("Xu hướng sắp tới sẽ giảm")
+    if result[1,0] < result[1,1] and result[1,1] < result[1,2]:
+        st.header("Xu hướng sắp tới sẽ tăng")
+    if result[1,0] > result[1,1] and result[1,1] < result[1,2] or result[1,0] < result[1,1] and result[1,1] > result[1,2]:
+        st.header("Xu hướng thị trường đang tích lũy")
 
