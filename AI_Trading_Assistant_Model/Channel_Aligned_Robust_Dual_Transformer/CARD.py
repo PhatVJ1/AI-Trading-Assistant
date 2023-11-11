@@ -11,7 +11,6 @@ class Transformer(tf.keras.Model):
         self,
         seq_length: int,
         output_length: int,
-        channel: int,
         patch_size: int,
         strides: int,
         dff: int,
@@ -24,7 +23,6 @@ class Transformer(tf.keras.Model):
         super().__init__()
         self.TransformerBlock = DualTransformerBlock(seq_length=seq_length, patch_size=patch_size, strides=strides, dff=dff, num_layer=num_layer, num_heads=num_heads, d_model=d_model, decay=decay)
         self.T2S = Tensor2Seq(output_length=output_length, dff=dff)
-        self.channel = channel
 
     def call(self, x):
         x = tf.cast(x, tf.float32)

@@ -50,7 +50,7 @@ def model_run(input, model, model_name):
 
 if st.button("Đưa ra dự báo tương lai cho cổ phiếu bạn đang xem"):
     
-    model = CARD.Transformer(50, 3, 2, 3, 1, 2048, 8, 64, 0.9, 3)
+    model = CARD.Transformer(50, 3, 3, 1, 2048, 8, 64, 0.9, 3)
     CARD.model_builder(model, data_for_pred[1:])
 
     result = model_run(data_for_pred, model, stock_symbol)  # Gọi hàm chạy model
